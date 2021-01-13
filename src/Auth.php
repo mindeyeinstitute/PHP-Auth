@@ -951,10 +951,14 @@ final class Auth extends UserManager {
 	 *
 	 * When the user wants to proceed to the second step of the password reset, both pieces will be required again
 	 *
+     * Updated to accept custom selector/token. If not used defaults to Libs 20 character random generator
+     *
 	 * @param string $email the email address of the user who wants to request the password reset
 	 * @param callable $callback the function that sends the password reset information to the user
 	 * @param int|null $requestExpiresAfter (optional) the interval in seconds after which the request should expire
 	 * @param int|null $maxOpenRequests (optional) the maximum number of unexpired and unused requests per user
+	 * @param string|null $customSelector
+	 * @param string|null $customToken
 	 * @throws InvalidEmailException if the email address was invalid or could not be found
 	 * @throws EmailNotVerifiedException if the email address has not been verified yet via confirmation email
 	 * @throws ResetDisabledException if the user has explicitly disabled password resets for their account
@@ -966,7 +970,7 @@ final class Auth extends UserManager {
 	 * @see resetPassword
 	 * @see resetPasswordAndSignIn
 	 */
-	public function forgotPassword($email, callable $callback, $requestExpiresAfter = null, $maxOpenRequests = null) {
+	public function forgotPassword($email, callable $callback, $requestExpiresAfter = null, $maxOpenRequests = null, $customSelector = null, $customToken = null) {
 		$email = self::validateEmailAddress($email);
 
 		$this->throttle([ 'enumerateUsers', $this->getIpAddress() ], 1, (60 * 60), 75);
@@ -1008,7 +1012,7 @@ final class Auth extends UserManager {
 			$this->throttle([ 'requestPasswordReset', $this->getIpAddress() ], 4, (60 * 60 * 24 * 7), 2);
 			$this->throttle([ 'requestPasswordReset', 'user', $userData['id'] ], 4, (60 * 60 * 24 * 7), 2);
 
-			$this->createPasswordResetRequest($userData['id'], $requestExpiresAfter, $callback);
+			$this->createPasswordResetRequest($userData['id'], $requestExpiresAfter, $callback, $customSelector, $customToken);
 		}
 		else {
 			throw new TooManyRequestsException('', $requestExpiresAfter);
@@ -1197,9 +1201,9 @@ final class Auth extends UserManager {
 	 * @param callable $callback the function that sends the password reset information to the user
 	 * @throws AuthError if an internal problem occurred (do *not* catch)
 	 */
-	private function createPasswordResetRequest($userId, $expiresAfter, callable $callback) {
-		$selector = self::createRandomString(20);
-		$token = self::createRandomString(20);
+	private function createPasswordResetRequest($userId, $expiresAfter, callable $callback, $customSelector, $customToken) {
+		$selector = (isset($customSelector)) ? $customSelector : self::createRandomString(20);
+		$token = (isset($customToken)) ? $customToken : self::createRandomString(20);
 		$tokenHashed = \password_hash($token, \PASSWORD_DEFAULT);
 		$expiresAt = \time() + $expiresAfter;
 
